@@ -44,6 +44,21 @@ uv run pytest
 uv run ruff check .
 ```
 
+## Crawler (Block 1)
+
+Collects failed GitHub Actions jobs with their log, commit diff and run history, following the method of Ge & Zhang (2026).
+
+```bash
+cp config/projects.example.txt config/projects.txt   # one owner/repo per line
+uv run flaky-crawl --projects config/projects.txt --days 90   # first crawl
+uv run flaky-crawl --projects config/projects.txt              # daily, 30-day look-back
+```
+
+- Every completed run is indexed in `data/github.sqlite` (the job history). For runs that failed or were rerun, the jobs of every attempt are fetched. Logs are downloaded for failed jobs only (`data/logs/`), along with the commit (`data/commits/`).
+- It is incremental: a run is re-examined when someone reruns it, and nothing is downloaded twice. GitHub keeps logs for about 90 days, so run it **every day** (Windows Task Scheduler or cron).
+- Automatic labels (`flaky_agent.data.labels`): **flaky** if the job failed and succeeded across attempts of the same run, **not_flaky** if it failed on every attempt (at least 2), **unknown** if it failed once and was never rerun. Cause and action labels are added by hand.
+- Reruns caused by maintainer approval (first-time contributors' PRs) have no jobs in attempt 1, so they are not counted as flaky.
+
 ## References
 
 - Ge, W., & Zhang, C. (2026). *Understanding and Detecting Flaky Builds in GitHub Actions*. arXiv:2602.02307.

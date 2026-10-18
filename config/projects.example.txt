@@ -1,0 +1,3 @@
+# Projects to crawl, one owner/repo per line. Copy to config/projects.txt.
+# The real list will come from SEART GitHub Search (Java, active, uses GitHub Actions).
+apache/commons-lang

@@ -9,7 +9,13 @@ authors = [
     { name = "Ismail Allouch" },
     { name = "Omar Bouhlal" },
 ]
-dependencies = []
+dependencies = [
+    "httpx>=0.28.1",
+    "python-dotenv>=1.2.4",
+]
+
+[project.scripts]
+flaky-crawl = "flaky_agent.data.crawl:main"
 
 [dependency-groups]
 dev = [
