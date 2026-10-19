@@ -49,11 +49,12 @@ uv run ruff check .
 Collects failed GitHub Actions jobs with their log, commit diff and run history, following the method of Ge & Zhang (2026).
 
 ```bash
-cp config/projects.example.txt config/projects.txt   # one owner/repo per line
+uv run flaky-select                                          # writes config/projects.txt
 uv run flaky-crawl --projects config/projects.txt --days 90   # first crawl
 uv run flaky-crawl --projects config/projects.txt              # daily, 30-day look-back
 ```
 
+- **Project selection** (`flaky-select`): SEART GitHub Search with the paper's criteria (Java, not a fork, ≥150 stars, ≥250 commits, a commit in the last 90 days), then our own step: keep projects with ≥50 workflow runs and ≥5 failed runs in the last 30 days, and take the top 100 by failed runs. The list notes which projects use secrets (their jobs can't be rerun from a fork). Measurements are cached in `data/selection/candidates.csv`, so an interrupted selection resumes.
 - Every completed run is indexed in `data/github.sqlite` (the job history). For runs that failed or were rerun, the jobs of every attempt are fetched. Logs are downloaded for failed jobs only (`data/logs/`), along with the commit (`data/commits/`).
 - It is incremental: a run is re-examined when someone reruns it, and nothing is downloaded twice. GitHub keeps logs for about 90 days, so run it **every day** (Windows Task Scheduler or cron).
 - Automatic labels (`flaky_agent.data.labels`): **flaky** if the job failed and succeeded across attempts of the same run, **not_flaky** if it failed on every attempt (at least 2), **unknown** if it failed once and was never rerun. Cause and action labels are added by hand.

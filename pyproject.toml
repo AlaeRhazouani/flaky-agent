@@ -12,10 +12,12 @@ authors = [
 dependencies = [
     "httpx>=0.28.1",
     "python-dotenv>=1.2.4",
+    "truststore>=0.10.5",
 ]
 
 [project.scripts]
 flaky-crawl = "flaky_agent.data.crawl:main"
+flaky-select = "flaky_agent.data.selection:main"
 
 [dependency-groups]
 dev = [

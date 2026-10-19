@@ -6,6 +6,7 @@ import pytest
 from flaky_agent.data.collector import Collector
 from flaky_agent.data.github import GitHubClient
 from flaky_agent.data.labels import FLAKY, NOT_FLAKY, UNKNOWN, failed_jobs, label_sequence
+from flaky_agent.data.selection import SECRET_RE
 from flaky_agent.data.storage import Store
 
 REPO = "acme/app"
@@ -133,3 +134,16 @@ def test_rerun_after_first_crawl_is_picked_up(setup):
     # Only the new attempt is fetched, and the existing log is not downloaded again.
     assert not any("/attempts/1/" in p for p in fake.requests)
     assert not any(p.endswith("/logs") for p in fake.requests)
+
+
+@pytest.mark.parametrize(
+    ("workflow", "expected"),
+    [
+        ("token: ${{ secrets.GITHUB_TOKEN }}", False),
+        ("password: ${{ secrets.SONATYPE_PASSWORD }}", True),
+        ("    secrets: inherit", True),
+        ("run: mvn verify", False),
+    ],
+)
+def test_secret_detection(workflow, expected):
+    assert bool(SECRET_RE.search(workflow)) == expected
