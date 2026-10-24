@@ -6,7 +6,7 @@ import pytest
 from flaky_agent.data.collector import Collector
 from flaky_agent.data.github import GitHubClient
 from flaky_agent.data.labels import FLAKY, NOT_FLAKY, UNKNOWN, failed_jobs, label_sequence
-from flaky_agent.data.selection import SECRET_RE
+from flaky_agent.data.selection import SECRET_RE, draw, eligible
 from flaky_agent.data.storage import Store
 
 REPO = "acme/app"
@@ -147,3 +147,27 @@ def test_rerun_after_first_crawl_is_picked_up(setup):
 )
 def test_secret_detection(workflow, expected):
     assert bool(SECRET_RE.search(workflow)) == expected
+
+
+def candidate(repo, runs, failed, status="ok"):
+    return {"repo": repo, "status": status, "runs_30d": str(runs), "failed_runs_30d": str(failed)}
+
+
+def test_eligible_applies_activity_bounds():
+    rows = [
+        candidate("ok/project", 200, 20),
+        candidate("too/quiet", 49, 10),
+        candidate("too/busy", 1001, 50),
+        candidate("few/failures", 200, 4),
+        candidate("always/broken", 100, 51),
+        candidate("gone/repo", 200, 20, status="not_found"),
+    ]
+    assert [r["repo"] for r in eligible(rows, 50, 1000, 5, 0.5)] == ["ok/project"]
+
+
+def test_draw_is_reproducible():
+    pool = [candidate(f"org/p{i:03}", 100, 10) for i in range(300)]
+    first = draw(pool, 100, seed=42)
+    assert len(first) == 100
+    assert first == draw(pool, 100, seed=42)
+    assert first != draw(pool, 100, seed=7)

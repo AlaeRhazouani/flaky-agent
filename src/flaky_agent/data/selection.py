@@ -1,4 +1,4 @@
-"""Project selection: SEART GitHub Search candidates, ranked by recent GitHub Actions activity.
+"""Project selection: SEART GitHub Search candidates, filtered by recent GitHub Actions activity.
 
 Stage 1 applies the criteria of Ge & Zhang (2026) through the SEART API: not a fork, main
 language Java, at least 150 stars and 250 commits, a commit in the last 3 months.
@@ -6,8 +6,13 @@ Stage 2 is ours: for each candidate, count its workflow runs and failed runs ove
 30 days. A project with no runs does not use GitHub Actions, which replaces the paper's
 check for a .github/workflows directory. Results are appended to a CSV as they come, so an
 interrupted selection resumes where it stopped.
-Stage 3 keeps the most active projects and records whether their workflows use secrets,
-since jobs that need secrets cannot be rerun from a fork.
+Stage 3 keeps projects with bounded activity and draws a reproducible random sample:
+- at least 50 runs and 5 failed runs: enough failures to collect;
+- at most 1,000 runs: keeps the crawl within the API quota, and stays far below the
+  2,500 ceiling of the runs endpoint's total_count, so the reported counts are exact;
+- at most 50% failed runs: excludes permanently broken workflows, which are not flaky.
+Ranking by failures instead would select giant monorepos only. Whether the workflows use
+secrets is recorded for the drawn projects, since such jobs cannot be rerun from a fork.
 """
 
 from __future__ import annotations
@@ -17,11 +22,12 @@ import base64
 import csv
 import logging
 import os
+import random
 import re
 import ssl
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -121,14 +127,44 @@ def read_measured(path: Path) -> dict[str, dict[str, str]]:
         return {row["repo"]: row for row in csv.DictReader(f)}
 
 
+def eligible(
+    rows: Iterable[dict[str, str]],
+    min_runs: int,
+    max_runs: int,
+    min_failed: int,
+    max_failed_ratio: float,
+) -> list[dict[str, str]]:
+    """Measured candidates within the activity bounds, sorted by name for a stable draw."""
+    kept = []
+    for r in rows:
+        if r["status"] != "ok":
+            continue
+        runs, failed = int(r["runs_30d"]), int(r["failed_runs_30d"])
+        if (
+            min_runs <= runs <= max_runs
+            and failed >= min_failed
+            and failed <= max_failed_ratio * runs
+        ):
+            kept.append(r)
+    return sorted(kept, key=lambda r: r["repo"].lower())
+
+
+def draw(pool: list[dict[str, str]], size: int, seed: int) -> list[dict[str, str]]:
+    sample = random.Random(seed).sample(pool, min(size, len(pool)))
+    return sorted(sample, key=lambda r: r["repo"].lower())
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Select projects to crawl.")
     parser.add_argument("--language", default="Java")
     parser.add_argument("--stars-min", type=int, default=150)
     parser.add_argument("--commits-min", type=int, default=250)
     parser.add_argument("--min-runs", type=int, default=50, help="workflow runs in 30 days")
+    parser.add_argument("--max-runs", type=int, default=1000, help="workflow runs in 30 days")
     parser.add_argument("--min-failed", type=int, default=5, help="failed runs in 30 days")
-    parser.add_argument("--top", type=int, default=100, help="number of projects to keep")
+    parser.add_argument("--max-failed-ratio", type=float, default=0.5)
+    parser.add_argument("--sample", type=int, default=100, help="number of projects to draw")
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--limit", type=int, help="measure at most this many new candidates (for a trial run)"
     )
@@ -170,27 +206,24 @@ def main(argv: list[str] | None = None) -> int:
             if n % 50 == 0:
                 log.info("measured %d new candidates", n)
 
-        active = [
-            r
-            for r in measured.values()
-            if r["status"] == "ok"
-            and int(r["runs_30d"]) >= args.min_runs
-            and int(r["failed_runs_30d"]) >= args.min_failed
-        ]
-        active.sort(key=lambda r: int(r["failed_runs_30d"]), reverse=True)
-        selected = active[: args.top]
+        pool = eligible(
+            measured.values(), args.min_runs, args.max_runs, args.min_failed, args.max_failed_ratio
+        )
+        selected = draw(pool, args.sample, args.seed)
         log.info(
-            "%d candidates measured, %d active, %d kept", len(measured), len(active), len(selected)
+            "%d candidates measured, %d eligible, %d drawn", len(measured), len(pool), len(selected)
         )
         secrets = {r["repo"]: uses_secrets(client, r["repo"]) for r in selected}
 
-    write_projects(args, selected, secrets, today.isoformat())
+    write_projects(args, len(measured), len(pool), selected, secrets, today.isoformat())
     log.info("wrote %s", args.output)
     return 0
 
 
 def write_projects(
     args: argparse.Namespace,
+    n_measured: int,
+    n_eligible: int,
     selected: list[dict[str, str]],
     secrets: dict[str, bool],
     today: str,
@@ -199,9 +232,12 @@ def write_projects(
     lines = [
         f"# Selected on {today} by flaky-select.",
         f"# SEART: language={args.language}, stars>={args.stars_min}, "
-        f"commits>={args.commits_min}, no forks, committed in the last 90 days.",
-        f"# Kept: runs_30d>={args.min_runs}, failed_runs_30d>={args.min_failed}, "
-        f"top {args.top} by failed runs.",
+        f"commits>={args.commits_min}, no forks, committed in the last 90 days "
+        f"({n_measured} candidates).",
+        f"# Eligible: {args.min_runs}<=runs_30d<={args.max_runs}, "
+        f"failed_runs_30d>={args.min_failed}, failed ratio<={args.max_failed_ratio} "
+        f"({n_eligible} projects).",
+        f"# Drawn: {len(selected)} at random, seed {args.seed}.",
         "# Columns after the repo are informational: failed runs / runs in 30 days, secrets.",
         "",
     ]

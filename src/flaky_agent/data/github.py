@@ -15,7 +15,8 @@ log = logging.getLogger(__name__)
 
 
 class NotFound(Exception):
-    """The resource is gone (404/410), e.g. a log past GitHub's retention period."""
+    """The resource is unavailable (404/410/451): e.g. a log past GitHub's retention
+    period, or a repository blocked for legal reasons (DMCA takedown)."""
 
 
 class GitHubClient:
@@ -77,7 +78,7 @@ class GitHubClient:
                 log.warning("network error on %s (%s), retrying", url, exc)
                 time.sleep(2**attempt)
                 continue
-            if resp.status_code in (404, 410):
+            if resp.status_code in (404, 410, 451):
                 raise NotFound(url)
             if resp.status_code in (403, 429) and _is_rate_limited(resp):
                 wait = _rate_limit_wait(resp)
