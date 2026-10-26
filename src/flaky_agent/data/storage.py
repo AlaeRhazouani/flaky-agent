@@ -2,12 +2,13 @@
 
 Layout under the data directory:
     github.sqlite                      runs, jobs, commits (with the raw API JSON)
-    logs/{owner}__{repo}/{job_id}.log  one log per failed job
+    logs/{owner}__{repo}/{job_id}.log.gz  one gzipped log per failed job
     commits/{owner}__{repo}/{sha}.json commit metadata and diff
 """
 
 from __future__ import annotations
 
+import gzip
 import json
 import sqlite3
 from pathlib import Path
@@ -141,12 +142,18 @@ class Store:
         self.conn.commit()
 
     def log_path(self, repo: str, job_id: int) -> Path:
-        return self.data_dir / "logs" / _slug(repo) / f"{job_id}.log"
+        return self.data_dir / "logs" / _slug(repo) / f"{job_id}.log.gz"
 
     def save_log(self, repo: str, job_id: int, content: bytes) -> None:
+        # Build logs are repetitive text: gzip shrinks them about tenfold.
         path = self.log_path(repo, job_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(content)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_bytes(gzip.compress(content, compresslevel=6))
+        tmp.replace(path)  # a crash mid-write never leaves a truncated log that looks complete
+
+    def read_log(self, repo: str, job_id: int) -> bytes:
+        return gzip.decompress(self.log_path(repo, job_id).read_bytes())
 
     def has_commit(self, repo: str, sha: str) -> bool:
         row = self.conn.execute(

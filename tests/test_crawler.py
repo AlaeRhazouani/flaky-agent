@@ -110,7 +110,7 @@ def test_collects_failed_jobs_logs_and_commit(setup):
 
     labels = {(j.run_id, j.name): (j.label, j.job_id) for j in failed_jobs(store)}
     assert labels == {(1, "build"): (FLAKY, 10), (3, "build"): (UNKNOWN, 30)}
-    assert store.log_path(REPO, 10).read_bytes() == b"log of 10"
+    assert store.read_log(REPO, 10) == b"log of 10"
     assert not store.log_path(REPO, 30).exists()
     assert store.has_commit(REPO, "abc123") and store.has_commit(REPO, "def456")
     # Run 2 succeeded on its only attempt: its jobs are never fetched.
