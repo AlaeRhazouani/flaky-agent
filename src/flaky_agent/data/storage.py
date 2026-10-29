@@ -141,6 +141,9 @@ class Store:
         )
         self.conn.commit()
 
+    def job(self, job_id: int) -> sqlite3.Row | None:
+        return self.conn.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+
     def log_path(self, repo: str, job_id: int) -> Path:
         return self.data_dir / "logs" / _slug(repo) / f"{job_id}.log.gz"
 

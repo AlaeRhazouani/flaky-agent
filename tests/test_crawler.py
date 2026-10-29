@@ -1,3 +1,4 @@
+import json
 from datetime import date
 
 import httpx
@@ -7,6 +8,7 @@ from flaky_agent.data.collector import Collector
 from flaky_agent.data.github import GitHubClient
 from flaky_agent.data.labels import FLAKY, NOT_FLAKY, UNKNOWN, failed_jobs, label_sequence
 from flaky_agent.data.selection import SECRET_RE, draw, eligible
+from flaky_agent.data.show import error_lines, failed_steps
 from flaky_agent.data.storage import Store
 
 REPO = "acme/app"
@@ -171,3 +173,21 @@ def test_draw_is_reproducible():
     assert len(first) == 100
     assert first == draw(pool, 100, seed=42)
     assert first != draw(pool, 100, seed=7)
+
+
+def test_error_lines_and_failed_steps():
+    log = (
+        "2026-07-31T19:48:23.27Z Downloading foo.jar\n"
+        "2026-07-31T19:48:23.50Z [ ERROR ] Parsing 'tests' failed\n"
+        "2026-07-31T19:48:24.10Z [ERROR] Could not transfer artifact: Connection reset\n"
+        "2026-07-31T19:48:24.20Z > testParseException PASSED\n"
+        "2026-07-31T19:48:25.00Z Caused by: java.net.SocketException: Connection reset\n"
+        "2026-07-31T19:48:26.00Z ##[error]Process completed with exit code 1.\n"
+    )
+    assert error_lines(log, 3) == [
+        (2, "[ ERROR ] Parsing 'tests' failed"),
+        (3, "[ERROR] Could not transfer artifact: Connection reset"),
+        (5, "Caused by: java.net.SocketException: Connection reset"),
+    ]
+    steps = [{"name": "Build", "conclusion": "failure"}, {"name": "Post", "conclusion": "success"}]
+    assert failed_steps(json.dumps({"steps": steps})) == ["Build"]

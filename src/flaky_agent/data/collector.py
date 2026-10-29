@@ -60,8 +60,11 @@ class Collector:
         run_id = run["run_id"]
         any_failed = False
         for attempt in range(run["processed_attempt"] + 1, run["run_attempt"] + 1):
+            # Pages of 100 jobs (each with its steps) time out with a 502 on large matrix runs.
             jobs = self.client.paginate(
-                f"/repos/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs", key="jobs"
+                f"/repos/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs",
+                {"per_page": 30},
+                key="jobs",
             )
             for job in jobs:
                 log_status = None

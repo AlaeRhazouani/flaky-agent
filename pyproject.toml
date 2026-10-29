@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 flaky-crawl = "flaky_agent.data.crawl:main"
 flaky-select = "flaky_agent.data.selection:main"
+flaky-show = "flaky_agent.data.show:main"
 
 [dependency-groups]
 dev = [
