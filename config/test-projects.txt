@@ -1,0 +1,34 @@
+# Test projects: drawn on 2026-11-16 from config/projects.txt.
+# Drawn: 30 of the 100 at random, seed 42, by
+#   random.Random(42).sample(sorted(read_projects('config/projects.txt')), 30)
+# The other 70 are training projects. Cause and action labels are made on test projects only.
+Consensys-Incorporated/web3signer
+apache/artemis
+apache/avro
+apache/parquet-java
+apache/skywalking
+apache/systemds
+appium/java-client
+btraceio/btrace
+corretto/corretto-8
+dadoonet/fscrawler
+datastax/jvector
+deepjavalibrary/djl
+eclipse-cdt/cdt
+jhipster/prettier-java
+jmetal/jmetal
+line/armeria
+orcid/orcid-source
+quarkiverse/quarkus-roq
+resilience4j/resilience4j
+sirixdb/sirix
+sonarsource/sonar-scanner-gradle
+spring-projects/spring-data-jpa
+ta-lib/ta-lib
+terrakube-io/terrakube
+traccar/traccar
+tsantalis/refactoringminer
+wicketstuff/core
+wurst-imperium/wurst7
+xtclang/xvm
+yegor256/takes

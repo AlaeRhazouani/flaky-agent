@@ -18,6 +18,9 @@ The item to label is one **job** of one run, with all its attempts. Its category
 are read from the log of its **first failed attempt**: that is the only log the agent would have
 when the failure happens, before any rerun.
 
+A job that passed on rerun only because another repo changed in between is still flaky. Its root
+cause is Upstream Repository Issue, and its action is not Rerun.
+
 ## 2. The 18 categories
 
 ### Network Issue
@@ -190,9 +193,11 @@ Rerun.
 **Definition:** a test failed, and the same test passed on another attempt of the same commit.
 Excluded from Ge & Zhang's Table 1 (64.99% of their flaky failures).
 
-**Root causes** (Luo et al., 2014, section 3.1): Async Wait, Concurrency, Test Order Dependency
-(77% of their cases together), Resource Leak, Network, Time, IO, Randomness, Floating Point,
-Unordered Collection. Action: usually Rerun.
+**Labeled at the category level only:** no root cause. Action: Rerun and Report Test.
+
+For reference, Luo et al. (2014, section 3.1) give these root causes of flaky tests: Async Wait,
+Concurrency, Test Order Dependency (77% of their cases together), Resource Leak, Network, Time,
+IO, Randomness, Floating Point, Unordered Collection.
 
 ### Genuine Failure
 
@@ -214,13 +219,14 @@ Label alone: don't discuss a job with the other annotator until both of you have
 3. **Read the first error of that test or step.** Later errors are usually its consequences.
 4. **Category: the stage that failed.** The stage wins over the cause (section 4).
 5. **Root cause: why it failed**, from the list under that category. A transient failure to
-   reach a remote service (timeout, reset, HTTP 5xx) is Network Issue.
+   reach a remote service (timeout, reset, HTTP 5xx) is Network Issue. Flaky Test has no root
+   cause: leave it empty.
 6. **Label what happened, not a keyword in the log.** An `OutOfMemoryError` injected by a test,
    or a refused connection to `localhost`, is not what it looks like.
 7. **Action: the one that fixes the root cause**, as listed with it in section 2. Don't
    infer it from the run history: for a flaky job, developers nearly always just reran it, and the
-   delay before the rerun doesn't say why. That delay is recorded automatically from the attempts'
-   timestamps, not by the annotator.
+   delay before the rerun doesn't say why. That delay, and the number of reruns before success,
+   are computed automatically from the attempts, not by the annotator.
 8. **Uncertain:** if the log isn't enough, give your best label, mark it uncertain and say why in
    the note. Don't guess silently.
 
@@ -248,12 +254,6 @@ Examples:
   Resolution Issue → Lock Contention.
 - `##[error]No space left on device`: no stage applies, so Memory Limit → Disk Space Exhaustion.
 
-**Flaky Test root causes from a log.** A test that fails a time budget ("within X ms", "waited
-X ms") is Async Wait, unless the log shows threads interfering (Concurrency). Time is only for
-tests that depend on what the clock shows (date, time zone). A test that prints a random seed
-(`__randomizedtesting.SeedInfo.seed`) and fails by a large margin is Randomness: Floating Point
-differences are tiny.
-
 Check the host first: a refused connection to `localhost` in a test is usually a server that
 wasn't ready yet, so it's a timing problem, not a network one.
 
@@ -266,7 +266,7 @@ Each annotator fills their own file, `labels/<annotator>.csv`, with one line per
 | `job_id` | the job id given by `flaky-show` |
 | `repo` | `owner/repo` |
 | `category` | one of the 18 names of section 2, spelled exactly |
-| `root_cause` | a root cause listed under that category, spelled exactly |
+| `root_cause` | a root cause listed under that category, spelled exactly; empty for Flaky Test |
 | `action` | the action listed with that root cause in section 2 |
 | `uncertain` | `yes` or `no` |
 | `note` | why you hesitated, or what didn't fit; empty otherwise |
