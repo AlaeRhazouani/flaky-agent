@@ -6,7 +6,15 @@ import pytest
 
 from flaky_agent.data.collector import Collector
 from flaky_agent.data.github import GitHubClient
-from flaky_agent.data.labels import FLAKY, NOT_FLAKY, UNKNOWN, failed_jobs, label_sequence
+from flaky_agent.data.labels import (
+    FLAKY,
+    NOT_FLAKY,
+    UNKNOWN,
+    FailedJob,
+    failed_jobs,
+    label_sequence,
+)
+from flaky_agent.data.sample import draw as draw_sample
 from flaky_agent.data.selection import SECRET_RE, draw, eligible
 from flaky_agent.data.show import error_lines, failed_steps
 from flaky_agent.data.storage import Store
@@ -191,3 +199,15 @@ def test_error_lines_and_failed_steps():
     ]
     steps = [{"name": "Build", "conclusion": "failure"}, {"name": "Post", "conclusion": "success"}]
     assert failed_steps(json.dumps({"steps": steps})) == ["Build"]
+
+
+def test_sample_caps_each_project():
+    jobs = [FailedJob("big/repo", i, "build", i, 2, FLAKY) for i in range(50)]
+    jobs += [FailedJob("small/repo", 100 + i, "build", 100 + i, 2, FLAKY) for i in range(3)]
+    jobs += [FailedJob("big/repo", 200 + i, "build", 200 + i, 2, NOT_FLAKY) for i in range(20)]
+    sample, both = draw_sample(jobs, cap=10, not_flaky=5, overlap=4, seed=1)
+    labels = [(j.repo, j.label) for j in sample]
+    assert labels.count(("big/repo", FLAKY)) == 10 and labels.count(("small/repo", FLAKY)) == 3
+    assert labels.count(("big/repo", NOT_FLAKY)) == 5
+    assert len(both) == 4 and both <= {j.job_id for j in sample}
+    assert draw_sample(jobs, 10, 5, 4, seed=1) == (sample, both)

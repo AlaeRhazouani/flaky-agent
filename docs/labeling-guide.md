@@ -214,7 +214,8 @@ it, we may add a category.
 Label alone: don't discuss a job with the other annotator until both of you have labeled it.
 
 1. **Open the job** with `uv run flaky-show job <job_id>`, which prints its failed steps, first
-   error lines and GitHub link.
+   error lines and GitHub link. Without the crawled data, open `<job_id>.txt` from `logs.zip`
+   (made by `flaky-sample --zip`): the same summary, followed by the full log.
 2. **Find the failure**, starting from the end (see below).
 3. **Read the first error of that test or step.** Later errors are usually its consequences.
 4. **Category: the stage that failed.** The stage wins over the cause (section 4).
