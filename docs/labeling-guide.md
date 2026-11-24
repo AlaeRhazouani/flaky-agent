@@ -239,6 +239,24 @@ from a test that injects it on purpose, and the real failure is a timing test 6,
 
 ## 4. Edge cases
 
+**Which stage?** Look at what the build was doing just before the error:
+
+| Near the error | Stage | Category |
+|---|---|---|
+| `Downloading`, `Could not resolve`, `Could not transfer artifact`, `not found in ... repositories` | getting dependencies | Dependency Resolution Issue |
+| `COMPILATION ERROR`, `compileJava FAILED`, `error: cannot find symbol` | compiling | Compilation Error |
+| `Tests run: ... Failures: 1`, `<<< FAILURE!`, `AssertionError`, a test method name | running tests | Flaky Test if flaky, Genuine Failure if not_flaky |
+| `checkstyle`, `spotbugs`, `errorprone`, `pmd`, `scorecard`, `sonar` | static analysis | Static Analysis Error |
+| `git push`, `git fetch`, `! [rejected]` | Git operation | Git Repository Errors |
+| `restore cache`, `save cache` | CI cache | Cache Errors |
+| a `curl`, `tar` or shell command of a `run:` step | workflow script | Build Script Errors |
+| a failure inside another repo's action (`uses: ...`) | third-party action | Plugin/Tool Errors |
+
+Only when no stage applies, the category is the cause: `No space left on device` or
+`OutOfMemoryError` (Memory Limit), `Killed` or exit 137 with no Java error (Execution Crash),
+`429` or `rate limit` (API Service Unavailable), a bare `curl: (28)` or `Connection reset`
+(Network Issue).
+
 **The stage wins over the cause.** Four categories name a cause rather than a stage: Network
 Issue, API Service Unavailable, Concurrency Issue and Memory Limit. Our rule, based on Table 1
 of Ge & Zhang (2026):
@@ -255,12 +273,19 @@ Examples:
   Resolution Issue → Lock Contention.
 - `##[error]No space left on device`: no stage applies, so Memory Limit → Disk Space Exhaustion.
 
+**A third-party action that stops because a token, secret or permission is missing** worked as
+designed: it's External Environment Inconsistency → Authentication Failure, not Plugin/Tool
+Errors. Plugin/Tool Errors is for a tool that misbehaves.
+
 Check the host first: a refused connection to `localhost` in a test is usually a server that
 wasn't ready yet, so it's a timing problem, not a network one.
 
 ## 5. Output format
 
-Each annotator fills their own file, `labels/<annotator>.csv`, with one line per job:
+Each annotator fills their own file, `labels/<annotator>.csv`, with one line per job. Don't open
+and save it in Excel as is: Excel turns job ids into numbers like `1.29492E+11` and loses their
+digits. Use a text editor or LibreOffice, or Excel's Data → From Text/CSV with `job_id` as Text.
+Don't leave spaces around values: `no ` is not `no`.
 
 | Column | Content |
 |---|---|

@@ -20,7 +20,7 @@ data/*
 !data/README.md
 
 # Logs exported for annotators: shared directly, not committed
-labels/logs.zip
+labels/*.zip
 
 # Experiment outputs (agent runs, metrics, cost logs)
 results/
