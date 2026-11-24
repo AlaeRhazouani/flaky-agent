@@ -20,6 +20,7 @@ flaky-crawl = "flaky_agent.data.crawl:main"
 flaky-select = "flaky_agent.data.selection:main"
 flaky-show = "flaky_agent.data.show:main"
 flaky-sample = "flaky_agent.data.sample:main"
+flaky-reruns = "flaky_agent.data.reruns:main"
 
 [dependency-groups]
 dev = [

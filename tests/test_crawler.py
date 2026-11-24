@@ -14,6 +14,7 @@ from flaky_agent.data.labels import (
     failed_jobs,
     label_sequence,
 )
+from flaky_agent.data.reruns import rerun_stats
 from flaky_agent.data.sample import draw as draw_sample
 from flaky_agent.data.selection import SECRET_RE, draw, eligible
 from flaky_agent.data.show import error_lines, failed_steps
@@ -123,6 +124,7 @@ def test_collects_failed_jobs_logs_and_commit(setup):
     assert store.read_log(REPO, 10) == b"log of 10"
     assert not store.log_path(REPO, 30).exists()
     assert store.has_commit(REPO, "abc123") and store.has_commit(REPO, "def456")
+    assert [a["conclusion"] for a in store.attempts(REPO, 1, "build")] == ["failure", "success"]
     # Run 2 succeeded on its only attempt: its jobs are never fetched.
     assert not any("/runs/2/" in p for p in fake.requests)
 
@@ -211,3 +213,29 @@ def test_sample_caps_each_project():
     assert labels.count(("big/repo", NOT_FLAKY)) == 5
     assert len(both) == 4 and both <= {j.job_id for j in sample}
     assert draw_sample(jobs, 10, 5, 4, seed=1) == (sample, both)
+
+
+def attempt(conclusion, created, completed):
+    day = "2026-10-01T"
+    return {"conclusion": conclusion, "created_at": day + created, "completed_at": day + completed}
+
+
+def test_rerun_stats():
+    flaky = [
+        attempt("failure", "10:00:00Z", "10:20:00Z"),
+        attempt("cancelled", "10:25:00Z", "10:26:00Z"),
+        attempt("failure", "10:50:00Z", "11:10:00Z"),
+        attempt("success", "14:00:00Z", "14:25:00Z"),
+    ]
+    assert rerun_stats(flaky) == {
+        "delay_seconds": 1800.0,
+        "total_reruns": 2,
+        "reruns_before_success": 2,
+    }
+    not_flaky = [attempt("failure", "10:00:00Z", "10:20:00Z")] * 2
+    assert rerun_stats(not_flaky)["reruns_before_success"] is None
+    assert rerun_stats(not_flaky[:1]) == {
+        "delay_seconds": None,
+        "total_reruns": 0,
+        "reruns_before_success": None,
+    }

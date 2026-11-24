@@ -185,6 +185,14 @@ class Store:
             """
         ).fetchall()
 
+    def attempts(self, repo: str, run_id: int, name: str) -> list[dict[str, Any]]:
+        """The raw JSON of one job's attempts, oldest first."""
+        rows = self.conn.execute(
+            "SELECT raw FROM jobs WHERE repo = ? AND run_id = ? AND name = ? ORDER BY run_attempt",
+            (repo, run_id, name),
+        ).fetchall()
+        return [json.loads(r["raw"]) for r in rows]
+
 
 def _slug(repo: str) -> str:
     return repo.replace("/", "__")
